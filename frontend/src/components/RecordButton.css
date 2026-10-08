@@ -1,0 +1,46 @@
+.record-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.record-button__control {
+  padding: 0.7rem 1.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-width: 10rem;
+}
+
+.record-button__control--recording {
+  background: #b42318;
+  border-color: #b42318;
+}
+
+.record-button__control:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.record-button__control:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.record-button__control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.record-button__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}

@@ -3,12 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { InterviewRoom } from '../../src/pages/InterviewRoom';
 import * as interviewsApi from '../../src/services/interviewsApi';
-import type { InterviewSession } from '../../src/types/interview';
+import type { InterviewSession, Message } from '../../src/types/interview';
 
 jest.mock('../../src/services/interviewsApi', () => ({
   ...jest.requireActual('../../src/services/interviewsApi'),
   startOrResumeInterview: jest.fn(),
   recordConsent: jest.fn(),
+  getConversation: jest.fn(),
+  sendAudioReply: jest.fn(),
 }));
 
 const mockedStart = interviewsApi.startOrResumeInterview as jest.MockedFunction<
@@ -16,6 +18,9 @@ const mockedStart = interviewsApi.startOrResumeInterview as jest.MockedFunction<
 >;
 const mockedConsent = interviewsApi.recordConsent as jest.MockedFunction<
   typeof interviewsApi.recordConsent
+>;
+const mockedConversation = interviewsApi.getConversation as jest.MockedFunction<
+  typeof interviewsApi.getConversation
 >;
 
 const baseSession: InterviewSession = {
@@ -41,6 +46,42 @@ const declinedSession: InterviewSession = {
   consent: { decision: 'declined', decidedAt: '2026-01-02T00:00:00.000Z', noticeVersion: '1' },
 };
 
+const openingMessages: Message[] = [
+  {
+    id: 'm1',
+    author: 'agent',
+    kind: 'text',
+    text: "Hi, I'm AIfter Agent, your AI interviewer. Welcome to your interview.",
+    sequence: 1,
+    createdAt: '2026-01-02T00:00:00.000Z',
+  },
+  {
+    id: 'm2',
+    author: 'agent',
+    kind: 'text',
+    text: 'Lets Get Started:',
+    sequence: 2,
+    createdAt: '2026-01-02T00:00:00.000Z',
+  },
+  {
+    id: 'm3',
+    author: 'agent',
+    kind: 'text',
+    text: 'Could you give a brief intro about yourself?',
+    sequence: 3,
+    createdAt: '2026-01-02T00:00:00.000Z',
+  },
+];
+
+const audioReply: Message = {
+  id: 'm4',
+  author: 'candidate',
+  kind: 'audio',
+  audio: { contentType: 'audio/webm', durationMs: 1500, byteLength: 5 },
+  sequence: 4,
+  createdAt: '2026-01-02T00:00:01.000Z',
+};
+
 function renderRoom() {
   return render(
     <MemoryRouter initialEntries={['/jobs/job-1']}>
@@ -53,6 +94,10 @@ function renderRoom() {
 }
 
 describe('InterviewRoom', () => {
+  beforeEach(() => {
+    mockedConversation.mockResolvedValue([]);
+  });
+
   afterEach(() => {
     jest.resetAllMocks();
   });
@@ -77,18 +122,35 @@ describe('InterviewRoom', () => {
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument();
   });
 
-  it('hides the banner and shows the interview in progress after accepting', async () => {
+  it('shows the scripted opening in order after accepting consent', async () => {
     mockedStart.mockResolvedValue(baseSession);
     mockedConsent.mockResolvedValue(acceptedSession);
+    mockedConversation.mockResolvedValue(openingMessages);
     renderRoom();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Accept' }));
 
-    await waitFor(() =>
-      expect(screen.queryByRole('region', { name: /recording consent/i })).not.toBeInTheDocument(),
-    );
+    expect(await screen.findByText('Lets Get Started:')).toBeInTheDocument();
+    expect(
+      screen.getByText('Could you give a brief intro about yourself?'),
+    ).toBeInTheDocument();
     expect(mockedConsent).toHaveBeenCalledWith('session-1', 'accepted');
-    expect(screen.getByText(/interview in progress/i)).toBeInTheDocument();
+    expect(mockedConversation).toHaveBeenCalledWith('session-1');
+    expect(
+      screen.queryByRole('region', { name: /recording consent/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders a restored conversation with the audio reply playable', async () => {
+    mockedStart.mockResolvedValue(acceptedSession);
+    mockedConversation.mockResolvedValue([...openingMessages, audioReply]);
+    const { container } = renderRoom();
+
+    expect(await screen.findByText('Lets Get Started:')).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('audio')).not.toBeNull());
+    expect(container.querySelector('audio')?.getAttribute('src')).toContain(
+      '/api/interviews/session-1/messages/m4/audio',
+    );
   });
 
   it('does not show the banner for a session that is already in progress', async () => {

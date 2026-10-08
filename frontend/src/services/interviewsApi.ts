@@ -1,5 +1,10 @@
 import { getApiBaseUrl } from '../config';
-import type { ConsentDecision, InterviewSession, InterviewStatus } from '../types/interview';
+import type {
+  ConsentDecision,
+  InterviewSession,
+  InterviewStatus,
+  Message,
+} from '../types/interview';
 
 export class InterviewsApiError extends Error {
   constructor(
@@ -84,4 +89,93 @@ export async function recordConsent(
     },
   );
   return toSession(response);
+}
+
+function isAudioMetadata(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.contentType === 'string' &&
+    typeof candidate.durationMs === 'number' &&
+    typeof candidate.byteLength === 'number'
+  );
+}
+
+function isMessage(value: unknown): value is Message {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  const author = candidate.author;
+  const kind = candidate.kind;
+
+  return (
+    typeof candidate.id === 'string' &&
+    (author === 'agent' || author === 'candidate') &&
+    (kind === 'text' || kind === 'audio') &&
+    typeof candidate.sequence === 'number' &&
+    typeof candidate.createdAt === 'string' &&
+    (candidate.text === undefined || typeof candidate.text === 'string') &&
+    (candidate.audio === undefined || isAudioMetadata(candidate.audio))
+  );
+}
+
+function toMessage(response: Response, payload: unknown): Message {
+  if (!isMessage(payload)) {
+    throw new InterviewsApiError(response.status, 'Malformed message response');
+  }
+  return payload;
+}
+
+export async function getConversation(
+  sessionId: string,
+  signal?: AbortSignal,
+): Promise<Message[]> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/interviews/${encodeURIComponent(sessionId)}/messages`,
+    { signal },
+  );
+
+  if (!response.ok) {
+    throw new InterviewsApiError(response.status, `Conversation request failed (${response.status})`);
+  }
+
+  const payload = (await response.json()) as { messages?: unknown };
+  if (!payload || !Array.isArray(payload.messages) || !payload.messages.every(isMessage)) {
+    throw new InterviewsApiError(response.status, 'Malformed conversation response');
+  }
+
+  return payload.messages;
+}
+
+export function audioUrl(sessionId: string, messageId: string): string {
+  return `${getApiBaseUrl()}/api/interviews/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(
+    messageId,
+  )}/audio`;
+}
+
+export async function sendAudioReply(
+  sessionId: string,
+  blob: Blob,
+  durationMs: number,
+): Promise<Message> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/interviews/${encodeURIComponent(sessionId)}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': blob.type || 'audio/webm',
+        'x-audio-duration-ms': String(Math.max(0, Math.round(durationMs))),
+      },
+      body: blob,
+    },
+  );
+
+  if (!response.ok) {
+    throw new InterviewsApiError(response.status, `Could not save the recording (${response.status})`);
+  }
+
+  return toMessage(response, await response.json());
 }

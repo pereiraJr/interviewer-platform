@@ -3,12 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ConsentBanner } from '../components/ConsentBanner';
 import { InterviewChat } from '../components/InterviewChat';
 import { StatusMessage } from '../components/StatusMessage';
+import { useRecorder } from '../hooks/useRecorder';
 import {
   InterviewsApiError,
+  getConversation,
   recordConsent,
+  sendAudioReply,
   startOrResumeInterview,
 } from '../services/interviewsApi';
-import type { ConsentDecision, InterviewSession } from '../types/interview';
+import type { ConsentDecision, InterviewSession, Message } from '../types/interview';
 import './InterviewRoom.css';
 
 type LoadState = 'loading' | 'error' | 'ready';
@@ -18,6 +21,7 @@ export function InterviewRoom() {
   const navigate = useNavigate();
   const [state, setState] = useState<LoadState>('loading');
   const [session, setSession] = useState<InterviewSession | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [attempt, setAttempt] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
@@ -53,6 +57,45 @@ export function InterviewRoom() {
       active = false;
     };
   }, [id, attempt, navigate]);
+
+  const sessionId = session?.id;
+  const inProgress = session?.status === 'in_progress';
+
+  useEffect(() => {
+    if (!sessionId || !inProgress) {
+      return;
+    }
+
+    let active = true;
+    getConversation(sessionId)
+      .then((result) => {
+        if (active) {
+          setMessages(result);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setMessages([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [sessionId, inProgress]);
+
+  const handleSave = useCallback(
+    async (blob: Blob, durationMs: number): Promise<void> => {
+      if (!sessionId) {
+        return;
+      }
+      const message = await sendAudioReply(sessionId, blob, durationMs);
+      setMessages((previous) => [...previous, message]);
+    },
+    [sessionId],
+  );
+
+  const recorder = useRecorder(handleSave);
 
   const handleDecision = useCallback(
     (decision: ConsentDecision) => {
@@ -117,7 +160,18 @@ export function InterviewRoom() {
         />
       ) : null}
 
-      <InterviewChat status={session.status} />
+      <InterviewChat
+        status={session.status}
+        sessionId={session.id}
+        messages={messages}
+        canRecord={Boolean(inProgress) && recorder.state !== 'saving'}
+        recorderState={recorder.state}
+        recorderError={recorder.error}
+        onStartRecording={() => {
+          void recorder.start();
+        }}
+        onStopAndSave={recorder.stopAndSave}
+      />
     </section>
   );
 }

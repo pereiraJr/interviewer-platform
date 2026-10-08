@@ -1,0 +1,236 @@
+openapi: 3.1.0
+info:
+  title: AfterQuery Interviewer Platform - Interview Conversation API
+  version: 1.0.0
+  description: >
+    Conversation for an interview session: the ordered turns (the server-owned AIfter Agent
+    opening plus the candidate's recorded replies) and the stored audio. Messages are only
+    available and only accepted while the interview is in progress (consent accepted). Audio is
+    stored compressed as binary and streamed from a session-scoped endpoint; it is never embedded
+    in the history payload.
+servers:
+  - url: http://localhost:4000
+    description: Local development
+paths:
+  /api/interviews/{id}/messages:
+    get:
+      operationId: listInterviewMessages
+      summary: List the interview conversation in order
+      description: >
+        Returns the ordered conversation turns for the session. Text turns carry their text; audio
+        turns carry metadata only and are playable via the audio endpoint.
+      tags:
+        - conversation
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: The ordered conversation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationResponse"
+        "404":
+          description: Unknown session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: addAudioReply
+      summary: Add the candidate's recorded audio reply
+      description: >
+        Uploads a recorded audio answer as a raw binary body. The bytes are stored compressed as
+        binary; the created candidate message (with audio metadata) is returned and appears in the
+        conversation. Only allowed while the interview is in progress.
+      tags:
+        - conversation
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+        - name: x-audio-duration-ms
+          in: header
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          description: Duration of the recording in milliseconds (client-provided; bounded).
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+          audio/webm:
+            schema:
+              type: string
+              format: binary
+          audio/ogg:
+            schema:
+              type: string
+              format: binary
+          audio/mp4:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: The created candidate audio message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageView"
+        "400":
+          description: Missing, empty, or invalid audio.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Unknown session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The interview is not in progress (consent not accepted).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Audio exceeds the maximum allowed size.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          description: Unsupported audio content type.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/interviews/{id}/messages/{messageId}/audio:
+    get:
+      operationId: getMessageAudio
+      summary: Stream the audio for a candidate message
+      description: >
+        Returns the stored audio bytes with the correct media type so the candidate can play their
+        reply back. Scoped to the session that owns the message.
+      tags:
+        - conversation
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: The audio bytes.
+          content:
+            audio/webm:
+              schema:
+                type: string
+                format: binary
+            audio/ogg:
+              schema:
+                type: string
+                format: binary
+            audio/mp4:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Unknown session, message, or audio.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  parameters:
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: Identifier of the interview session.
+  schemas:
+    ConversationResponse:
+      type: object
+      additionalProperties: false
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageView"
+    MessageView:
+      type: object
+      additionalProperties: false
+      required: [id, author, kind, sequence, createdAt]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        author:
+          type: string
+          enum: [agent, candidate]
+        kind:
+          type: string
+          enum: [text, audio]
+        text:
+          type: string
+          description: Present for text turns.
+        audio:
+          $ref: "#/components/schemas/AudioMetadata"
+        sequence:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+    AudioMetadata:
+      type: object
+      additionalProperties: false
+      required: [contentType, durationMs, byteLength]
+      properties:
+        contentType:
+          type: string
+          description: Media type of the stored audio.
+        durationMs:
+          type: integer
+          minimum: 0
+        byteLength:
+          type: integer
+          minimum: 1
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
