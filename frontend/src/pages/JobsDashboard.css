@@ -1,12 +1,13 @@
 .jobs-dashboard {
-  padding: 1.5rem;
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-6) var(--space-8);
 }
 
 .jobs-dashboard__title {
-  margin-top: 0;
-}
-
-.jobs-dashboard__error,
-.jobs-dashboard__empty {
-  padding: 1.5rem;
+  margin: 0 0 var(--space-6);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
 }

@@ -1,0 +1,13 @@
+.app-header {
+  padding: var(--space-8) var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.app-header__title {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
