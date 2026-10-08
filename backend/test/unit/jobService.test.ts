@@ -7,6 +7,7 @@ describe('jobService.listAvailableJobs', () => {
     const jobs: JobSummary[] = [{ id: '1', title: 'Engineer', description: 'Build things' }];
     const repository: JobRepository = {
       findAvailableJobs: jest.fn().mockResolvedValue(jobs),
+      findAvailableJobById: jest.fn().mockResolvedValue(null),
     };
 
     const service = createJobService(repository);
@@ -18,6 +19,7 @@ describe('jobService.listAvailableJobs', () => {
   it('propagates repository errors', async () => {
     const repository: JobRepository = {
       findAvailableJobs: jest.fn().mockRejectedValue(new Error('db down')),
+      findAvailableJobById: jest.fn().mockResolvedValue(null),
     };
 
     const service = createJobService(repository);

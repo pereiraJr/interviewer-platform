@@ -1,0 +1,217 @@
+openapi: 3.1.0
+info:
+  title: AfterQuery Interviewer Platform - Interviews API
+  version: 1.0.0
+  description: >
+    Interview Room session API. Starting or resuming an interview for a role, retrieving a
+    session, and recording the candidate's recording-consent decision. The interview becomes
+    in_progress only after consent is accepted. Questioning, answers, and audio capture are out
+    of scope and have no endpoints here.
+servers:
+  - url: http://localhost:4000
+    description: Local development
+paths:
+  /api/jobs/{jobId}/interview:
+    post:
+      operationId: startOrResumeInterview
+      summary: Enter the Interview Room for a role (start or resume a session)
+      description: >
+        Returns the existing non-declined session for this job, or creates a new one in the
+        pre-consent state. The response includes the role context and the current consent state.
+      tags:
+        - interviews
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: The interview session for this role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterviewSessionView"
+        "404":
+          description: The job does not exist or is not available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/interviews/{id}:
+    get:
+      operationId: getInterviewSession
+      summary: Retrieve an interview session
+      description: Returns the session by id, e.g. to refresh or resume the room.
+      tags:
+        - interviews
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: The interview session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterviewSessionView"
+        "404":
+          description: Unknown session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/interviews/{id}/consent:
+    post:
+      operationId: recordConsent
+      summary: Record the candidate's recording-consent decision
+      description: >
+        Records the candidate's explicit decision about recording. `accepted` transitions the
+        session to in_progress and dismisses the banner; `declined` leaves the interview not
+        started and the candidate returns to the dashboard. Both are persisted for audit.
+      tags:
+        - interviews
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentRequest"
+      responses:
+        "200":
+          description: The updated interview session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterviewSessionView"
+        "400":
+          description: Invalid consent decision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Unknown session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  parameters:
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: Identifier of the role being interviewed for.
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: Identifier of the interview session.
+  schemas:
+    ConsentRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [accepted, declined]
+          description: The candidate's decision about recording.
+    ConsentRecord:
+      type: object
+      additionalProperties: false
+      required: [decision, decidedAt, noticeVersion]
+      properties:
+        decision:
+          type: string
+          enum: [accepted, declined]
+        decidedAt:
+          type: string
+          format: date-time
+        noticeVersion:
+          type: string
+          minLength: 1
+    Notice:
+      type: object
+      additionalProperties: false
+      required: [text, version]
+      properties:
+        text:
+          type: string
+          description: The recording notice shown to the candidate.
+        version:
+          type: string
+          description: Version of the notice text.
+    InterviewSessionView:
+      type: object
+      additionalProperties: false
+      required: [id, status, job, consent, notice]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum: [consent_pending, in_progress, declined]
+          description: Authoritative interview state; in_progress only after consent is accepted.
+        job:
+          $ref: "#/components/schemas/JobSummary"
+        consent:
+          oneOf:
+            - $ref: "#/components/schemas/ConsentRecord"
+            - type: "null"
+          description: The recorded decision, or null before any decision.
+        notice:
+          $ref: "#/components/schemas/Notice"
+    JobSummary:
+      type: object
+      additionalProperties: false
+      required: [id, title, description]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string

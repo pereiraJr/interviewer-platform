@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AppHeader } from './components/AppHeader';
-import { JobDetail } from './pages/JobDetail';
+import { InterviewRoom } from './pages/InterviewRoom';
 import { JobsDashboard } from './pages/JobsDashboard';
 
 export function App() {
@@ -10,7 +10,7 @@ export function App() {
       <main className="app-main">
         <Routes>
           <Route path="/" element={<JobsDashboard />} />
-          <Route path="/jobs/:id" element={<JobDetail />} />
+          <Route path="/jobs/:id" element={<InterviewRoom />} />
         </Routes>
       </main>
     </BrowserRouter>
