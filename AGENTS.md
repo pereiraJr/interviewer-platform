@@ -2,6 +2,7 @@
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
 
+- Adaptive Interview Questioning — `specs/006-adaptive-questioning/plan.md`
 - Interview Conversation — `specs/005-interview-conversation/plan.md`
 - Interview Room — `specs/004-interview-room/plan.md`
 - Dashboard Styling & Branding — `specs/003-dashboard-styling/plan.md`

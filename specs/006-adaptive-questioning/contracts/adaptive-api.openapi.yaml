@@ -1,0 +1,190 @@
+openapi: 3.1.0
+info:
+  title: AfterQuery Interviewer Platform - Adaptive Interview API
+  version: 1.1.0
+  description: >
+    Extends the Interview Conversation API (005). Submitting a candidate's voice answer now runs
+    the adaptive pipeline: the audio is validated for speech, transcribed server-side (never
+    surfaced), and a role-grounded follow-up question is generated through the configured
+    OpenRouter model and appended as an AIfter Agent message. The transcript is never returned.
+servers:
+  - url: http://localhost:4000
+    description: Local development
+paths:
+  /api/interviews/{id}/messages:
+    post:
+      operationId: submitVoiceAnswer
+      summary: Submit a voice answer and receive the generated follow-up question
+      description: >
+        Uploads the candidate's recorded answer as a raw binary body. The audio is checked for
+        speech; on a valid reply it is transcribed server-side and, while the interview is below
+        the 6-agent-message cap, a grounded follow-up question is generated and appended. The
+        candidate message and the generated question (when any) are returned. Silent/no-speech
+        audio is rejected and nothing is persisted.
+      tags:
+        - adaptive
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+        - name: x-audio-duration-ms
+          in: header
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      requestBody:
+        required: true
+        content:
+          audio/webm:
+            schema:
+              type: string
+              format: binary
+          audio/ogg:
+            schema:
+              type: string
+              format: binary
+          audio/mp4:
+            schema:
+              type: string
+              format: binary
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: The stored candidate message and, when generated, the follow-up question.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceAnswerResult"
+        "400":
+          description: Missing, empty, or invalid audio.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Unknown session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The interview is not in progress (consent not accepted).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Audio exceeds the maximum allowed size.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          description: Unsupported audio content type.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: No speech was detected in the recording; the candidate should re-record.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                noSpeech:
+                  value:
+                    error:
+                      code: "NO_SPEECH"
+                      message: "No speech was detected. Please record your answer again."
+        "502":
+          description: The model provider failed, timed out, or returned invalid output; retryable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                providerError:
+                  value:
+                    error:
+                      code: "PROVIDER_ERROR"
+                      message: "The interviewer is temporarily unavailable. Please try again."
+components:
+  parameters:
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  schemas:
+    VoiceAnswerResult:
+      type: object
+      additionalProperties: false
+      required: [message, question]
+      properties:
+        message:
+          $ref: "#/components/schemas/MessageView"
+        question:
+          oneOf:
+            - $ref: "#/components/schemas/MessageView"
+            - type: "null"
+          description: >
+            The generated follow-up question (an agent text message), or null when the cap is
+            reached. The candidate's transcript is never included.
+    MessageView:
+      type: object
+      additionalProperties: false
+      required: [id, author, kind, sequence, createdAt]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        author:
+          type: string
+          enum: [agent, candidate]
+        kind:
+          type: string
+          enum: [text, audio]
+        text:
+          type: string
+        audio:
+          type: object
+          additionalProperties: false
+          required: [contentType, durationMs, byteLength]
+          properties:
+            contentType:
+              type: string
+            durationMs:
+              type: integer
+              minimum: 0
+            byteLength:
+              type: integer
+              minimum: 1
+        source:
+          type: string
+          enum: [scripted, model]
+          description: Present on agent messages (opening = scripted, generated = model).
+        sequence:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
