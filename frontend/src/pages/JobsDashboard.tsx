@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { JobsGrid } from '../components/JobsGrid';
+import { StatusMessage } from '../components/StatusMessage';
 import { fetchJobs } from '../services/jobsApi';
 import type { Job } from '../types/job';
 import './JobsDashboard.css';
@@ -49,27 +50,35 @@ export function JobsDashboard() {
   );
 
   if (status === 'loading') {
-    return <p role="status">Loading jobs…</p>;
+    return (
+      <StatusMessage variant="loading">
+        <p>Loading available jobs…</p>
+      </StatusMessage>
+    );
   }
 
   if (status === 'error') {
     return (
-      <div role="alert" className="jobs-dashboard__error">
+      <StatusMessage variant="error">
         <p>We couldn&apos;t load the jobs right now.</p>
         <button type="button" onClick={retry}>
           Retry
         </button>
-      </div>
+      </StatusMessage>
     );
   }
 
   if (jobs.length === 0) {
-    return <p className="jobs-dashboard__empty">No jobs are available right now.</p>;
+    return (
+      <StatusMessage variant="empty">
+        <p>No jobs are available right now.</p>
+      </StatusMessage>
+    );
   }
 
   return (
     <section className="jobs-dashboard">
-      <h1 className="jobs-dashboard__title">Available jobs</h1>
+      <h2 className="jobs-dashboard__title">Available jobs</h2>
       <JobsGrid jobs={jobs} onSelect={handleSelect} />
     </section>
   );

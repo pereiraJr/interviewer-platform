@@ -33,6 +33,14 @@ describe('JobsDashboard', () => {
     expect(await screen.findByText('Engineer')).toBeInTheDocument();
   });
 
+  it('renders the "Available jobs" section heading below the product title level', async () => {
+    mockedFetchJobs.mockResolvedValue([{ id: '1', title: 'Engineer', description: 'A' }]);
+    renderDashboard();
+
+    const heading = await screen.findByRole('heading', { level: 2, name: /available jobs/i });
+    expect(heading).toBeInTheDocument();
+  });
+
   it('shows an empty state when there are no jobs', async () => {
     mockedFetchJobs.mockResolvedValue([]);
     renderDashboard();
