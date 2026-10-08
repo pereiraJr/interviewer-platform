@@ -1,0 +1,12 @@
+.jobs-dashboard {
+  padding: 1.5rem;
+}
+
+.jobs-dashboard__title {
+  margin-top: 0;
+}
+
+.jobs-dashboard__error,
+.jobs-dashboard__empty {
+  padding: 1.5rem;
+}
