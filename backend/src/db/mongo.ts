@@ -5,10 +5,10 @@ export interface MongoConnection {
   db: Db;
 }
 
-export async function connectToMongo(url: string, dbName: string): Promise<MongoConnection> {
+export async function connectToMongo(url: string, dbName?: string): Promise<MongoConnection> {
   const client = new MongoClient(url, { serverSelectionTimeoutMS: 5000 });
   await client.connect();
-  return { client, db: client.db(dbName) };
+  return { client, db: dbName ? client.db(dbName) : client.db() };
 }
 
 export async function closeMongo(connection: MongoConnection): Promise<void> {

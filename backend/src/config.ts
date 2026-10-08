@@ -1,7 +1,7 @@
 export interface AppConfig {
   port: number;
   mongoUrl: string;
-  mongoDb: string;
+  mongoDb: string | undefined;
   corsOrigin: string;
 }
 
@@ -21,11 +21,29 @@ function parsePort(raw: string | undefined): number {
   return port;
 }
 
+function resolveMongo(env: NodeJS.ProcessEnv): { mongoUrl: string; mongoDb: string | undefined } {
+  const configuredUrl = env.MONGO_URL?.trim() || env.MONGODB_URI?.trim();
+  const explicitDb = env.MONGO_DB?.trim();
+
+  if (!configuredUrl || configuredUrl === DEFAULT_MONGO_URL) {
+    return {
+      mongoUrl: configuredUrl || DEFAULT_MONGO_URL,
+      mongoDb: explicitDb || DEFAULT_MONGO_DB,
+    };
+  }
+
+  return {
+    mongoUrl: configuredUrl,
+    mongoDb: explicitDb || undefined,
+  };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const { mongoUrl, mongoDb } = resolveMongo(env);
   return {
     port: parsePort(env.PORT),
-    mongoUrl: env.MONGO_URL?.trim() || DEFAULT_MONGO_URL,
-    mongoDb: env.MONGO_DB?.trim() || DEFAULT_MONGO_DB,
+    mongoUrl,
+    mongoDb,
     corsOrigin: env.CORS_ORIGIN?.trim() || DEFAULT_CORS_ORIGIN,
   };
 }
