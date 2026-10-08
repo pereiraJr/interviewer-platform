@@ -1,25 +1,49 @@
-import type { InterviewStatus } from '../types/interview';
+import { MessageList } from './MessageList';
+import { RecordButton } from './RecordButton';
+import type { RecorderState } from '../hooks/useRecorder';
+import type { InterviewStatus, Message } from '../types/interview';
 import './InterviewChat.css';
 
 export interface InterviewChatProps {
   status: InterviewStatus;
+  sessionId: string;
+  messages: Message[];
+  canRecord: boolean;
+  recorderState: RecorderState;
+  recorderError?: string | null;
+  onStartRecording: () => void;
+  onStopAndSave: () => void;
 }
 
-export function InterviewChat({ status }: InterviewChatProps) {
+export function InterviewChat({
+  status,
+  sessionId,
+  messages,
+  canRecord,
+  recorderState,
+  recorderError,
+  onStartRecording,
+  onStopAndSave,
+}: InterviewChatProps) {
   const inProgress = status === 'in_progress';
 
   return (
     <section className="interview-chat" aria-label="Interview conversation">
-      <ol className="interview-chat__turns" />
-      <p className="interview-chat__empty">
-        {inProgress
-          ? 'The interview is in progress. Questions will appear here.'
-          : 'The conversation will appear here once the interview begins.'}
-      </p>
       {inProgress ? (
         <p className="interview-chat__state" role="status">
           Interview in progress
         </p>
+      ) : null}
+
+      <MessageList messages={messages} sessionId={sessionId} />
+
+      {canRecord ? (
+        <RecordButton
+          state={recorderState}
+          onStart={onStartRecording}
+          onStopSave={onStopAndSave}
+          error={recorderError}
+        />
       ) : null}
     </section>
   );

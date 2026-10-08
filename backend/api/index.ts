@@ -1,8 +1,15 @@
 import { createApp } from '../src/app';
 import { loadConfig } from '../src/config';
 import { connectToMongo, type MongoConnection } from '../src/db/mongo';
+import { createAudioRecordingRepository } from '../src/repositories/audioRecordingRepository';
+import { createInterviewMessageRepository } from '../src/repositories/interviewMessageRepository';
 import { createInterviewSessionRepository } from '../src/repositories/interviewSessionRepository';
 import { createJobRepository } from '../src/repositories/jobRepository';
+import {
+  createConversationService,
+  type AddAudioReplyInput,
+  type ConversationService,
+} from '../src/services/conversationService';
 import { createInterviewService, type InterviewService } from '../src/services/interviewService';
 import { createJobService, type JobService } from '../src/services/jobService';
 
@@ -47,7 +54,42 @@ const interviewService: InterviewService = {
   },
 };
 
+const conversationService: ConversationService = {
+  async getConversation(sessionId: string) {
+    const connection = await getConnection();
+    return createConversationService(
+      createInterviewSessionRepository(connection.db),
+      createInterviewMessageRepository(connection.db),
+      createAudioRecordingRepository(connection.db),
+    ).getConversation(sessionId);
+  },
+  async seedOpening(sessionId: string) {
+    const connection = await getConnection();
+    await createConversationService(
+      createInterviewSessionRepository(connection.db),
+      createInterviewMessageRepository(connection.db),
+      createAudioRecordingRepository(connection.db),
+    ).seedOpening(sessionId);
+  },
+  async addAudioReply(sessionId: string, input: AddAudioReplyInput) {
+    const connection = await getConnection();
+    return createConversationService(
+      createInterviewSessionRepository(connection.db),
+      createInterviewMessageRepository(connection.db),
+      createAudioRecordingRepository(connection.db),
+    ).addAudioReply(sessionId, input);
+  },
+  async getAudio(sessionId: string, messageId: string) {
+    const connection = await getConnection();
+    return createConversationService(
+      createInterviewSessionRepository(connection.db),
+      createInterviewMessageRepository(connection.db),
+      createAudioRecordingRepository(connection.db),
+    ).getAudio(sessionId, messageId);
+  },
+};
+
 const { corsOrigin } = loadConfig();
-const app = createApp({ jobService, interviewService, corsOrigin });
+const app = createApp({ jobService, interviewService, conversationService, corsOrigin });
 
 export default app;
